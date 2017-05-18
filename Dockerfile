@@ -1,4 +1,4 @@
-FROM phusion/baseimage
+FROM phusion/baseimage:0.9.18
 MAINTAINER Jason Martin <jason@greenpx.co.uk>
 
 # Set environment variables
@@ -116,6 +116,7 @@ RUN curl -sf -o asterisk.tar.gz -L http://downloads.asterisk.org/pub/telephony/a
 	&& sed -i "s/format_mp3//" menuselect.makeopts \
 	&& sed -i "s/BUILD_NATIVE//" menuselect.makeopts \
 	&& make \
+	&& make basic-pbx \
 	&& make install \
 	&& make config \
 	&& ldconfig \
@@ -154,15 +155,18 @@ RUN useradd -m $ASTERISKUSER \
 RUN sed -i 's/\(^upload_max_filesize = \).*/\120M/' /etc/php5/apache2/php.ini \
 	&& cp /etc/apache2/apache2.conf /etc/apache2/apache2.conf_orig \
 	&& sed -i 's/^\(User\|Group\).*/\1 asterisk/' /etc/apache2/apache2.conf \
-	&& sed -i 's/AllowOverride None/AllowOverride All/' /etc/apache2/apache2.conf
+	&& sed -i 's/AllowOverride None/AllowOverride All/' /etc/apache2/apache2.conf \
+	&& a2enmod rewrite
+
 
 # Configure Asterisk database in MYSQL
 RUN /etc/init.d/mysql start \
 	&& mysqladmin -u root create asterisk \
 	&& mysqladmin -u root create asteriskcdrdb \
-	&& mysql -u root -e "GRANT ALL PRIVILEGES ON asterisk.* TO $ASTERISKUSER@localhost IDENTIFIED BY '';" \
-	&& mysql -u root -e "GRANT ALL PRIVILEGES ON asteriskcdrdb.* TO $ASTERISKUSER@localhost IDENTIFIED BY '';" \
-	&& mysql -u root -e "flush privileges;"
+	&& mysql -u root -e "CREATE USER '$ASTERISKUSER'@'localhost' IDENTIFIED BY '';" \
+	&& mysql -u root -e "GRANT ALL PRIVILEGES ON asterisk.* TO '$ASTERISKUSER'@'localhost' IDENTIFIED BY '';" \
+	&& mysql -u root -e "GRANT ALL PRIVILEGES ON asteriskcdrdb.* TO '$ASTERISKUSER'@'localhost' IDENTIFIED BY '';" \
+	&& mysql -u root -e "FLUSH PRIVILEGES;"
 
 #Make CDRs work
 COPY conf/cdr/odbc.ini /etc/odbc.ini
